@@ -5,20 +5,25 @@ import traceback
 
 import bot
 
+from app.logger import get_logger
+
+log = get_logger(__name__)
+
+
 def run_bot():
     try:
         bot.main()
     except KeyboardInterrupt:
-        print('Application interrupted')
+        print("Application interrupted")
         return
     except Exception:
         traceback.print_exc()
         run_bot()
-    print('Application stopped')
+    print("Application stopped")
 
 
 def repeatedly_notify_users():
-    t_notifier = threading.Timer(60*60*1.0, repeatedly_notify_users)
+    t_notifier = threading.Timer(60 * 60 * 1.0, repeatedly_notify_users)
     t_notifier.daemon = True
     t_notifier.start()
     bot.remind()
