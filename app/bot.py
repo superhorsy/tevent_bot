@@ -61,8 +61,10 @@ def remind():
         log.info(f"Notification count: {len(user.notifications)}")
         if len(user.notifications) >= 3:
             continue
-        last_promo = Promo.find_promo(user.phone)
+        last_promo = Promo.find(user.phone)
         log.info(f"Last promo: {last_promo}")
+        if not last_promo:
+            continue
         if last_promo.is_valid():
             log.info("Promo is valid")
             continue
