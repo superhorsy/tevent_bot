@@ -4,46 +4,46 @@ import threading
 import traceback
 
 import bot
+from logger import get_logger
 
-from app.logger import get_logger
+log = get_logger("main_thr")
 
-log = get_logger(__name__)
+REMIND_TIME_INTERVAL = 60 * 60 * 1.0
+# REMIND_TIME_INTERVAL = 20
 
 
 def run_bot():
     try:
+        log.info("Application started")
         bot.main()
     except KeyboardInterrupt:
-        print("Application interrupted")
-        return
+        log.warning("Application interrupted")
+        exit(0)
     except Exception:
         traceback.print_exc()
         run_bot()
-    print("Application stopped")
+    log.info("Application stopped")
 
 
 def repeatedly_notify_users():
-    t_notifier = threading.Timer(60 * 60 * 1.0, repeatedly_notify_users)
+    t_notifier = threading.Timer(REMIND_TIME_INTERVAL, repeatedly_notify_users)
     t_notifier.daemon = True
     t_notifier.start()
     bot.remind()
 
 
-def signal_handler(signal, frame):
-    print("Application exited with signal " + str(signal))
+def signal_handler(signal, _):
+    log.info(f"Application exited with signal {str(signal)}")
     sys.exit(0)
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, signal_handler)
 
-    threads_arr = []
-
-    t_bot = threading.Thread(target=run_bot)
+    t_bot = threading.Thread(target=run_bot, name="Bot")
     t_bot.start()
-    threads_arr.append(t_bot)
-
-    t_notification = threading.Thread(target=repeatedly_notify_users)
+    threads_arr = [t_bot]
+    t_notification = threading.Thread(target=repeatedly_notify_users, name="Notifier")
     t_notification.start()
     threads_arr.append(t_notification)
 

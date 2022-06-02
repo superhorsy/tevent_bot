@@ -1,29 +1,35 @@
-import threading
 from abc import ABC
-from typing import Optional
 
-import pickledb
+import pymongo
+from pymongo.collection import Collection
+from pymongo.database import Database
 
 
 class User:
-    def __init__(self, phone, notifications=None):
-        if notifications is None:
-            notifications = []
-        self.notifications = notifications
+    chat_id: int
+    phone: str
+    notifications: list
+
+    def __init__(self, chat_id: int, phone: str, notifications: list = None):
+        self.notifications = [] if notifications is None else notifications
+        self.chat_id = chat_id
         self.phone = phone
 
 
 class UserAccessor(ABC):
-    def get(self, chat_id) -> Optional[User]:
+    def exists(self, chat_id) -> bool:
         pass
 
-    def set(self, chat_id, user: User):
+    def get(self, chat_id) -> User:
+        pass
+
+    def set(self, user: User):
         pass
 
     def delete(self, chat_id):
         pass
 
-    def get_all_chat_ids(self):
+    def keys(self):
         pass
 
 
@@ -31,31 +37,33 @@ class UserNotFoundError(Exception):
     pass
 
 
-class PickleDBUserAccessor(UserAccessor):
-    def __init__(self):
-        self.db = pickledb.load("db/users.db", True)
-        self.lock = threading.Lock()
+class MongoDBUserAccessor(UserAccessor):
+    def __init__(self, host: str, port: int, db: str) -> None:
+        self.db: Database = pymongo.MongoClient(f"mongodb://{host}:{port}/")[db]
+        self.collection: Collection = self.db.get_collection("users")
 
-    def get_all_chat_ids(self) -> list:
-        with self.lock:
-            data = self.db.getall()
+    def exists(self, chat_id: int) -> bool:
+        return self.collection.count_documents({"_id": chat_id}) > 0
+
+    def get(self, chat_id: int) -> User:
+        data = self.collection.find_one({"_id": chat_id})
         if not data:
-            return []
-        return data
+            raise UserNotFoundError(f"Didn't found user by chat_id {chat_id}")
+        return User(data["_id"], data["phone"], data["notifications"])
 
-    def get(self, chat_id) -> User:
-        with self.lock:
-            data = self.db.get(str(chat_id))
-        if not data:
-            raise UserNotFoundError("Didn't found user by chat_id " + chat_id)
-        return User(data["phone"], data["notifications"])
-
-    def set(self, chat_id, user: User):
-        with self.lock:
-            self.db.set(
-                str(chat_id), {"phone": user.phone, "notifications": user.notifications}
-            )
+    def set(self, user: User):
+        self.collection.replace_one(
+            {"_id": int(user.chat_id)},
+            {
+                "_id": int(user.chat_id),
+                "phone": user.phone,
+                "notifications": user.notifications,
+            },
+            upsert=True,
+        )
 
     def delete(self, chat_id):
-        with self.lock:
-            self.db.rem(str(chat_id))
+        self.collection.delete_many({"_id": int(chat_id)})
+
+    def keys(self):
+        return [i.get("_id") for i in self.collection.find()]

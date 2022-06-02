@@ -6,7 +6,7 @@ name = "pypi"
 [packages]
 gspread = "*"
 pytelegrambotapi = "*"
-pickledb = "*"
+pymongo = "*"
 
 [dev-packages]
 black = "*"

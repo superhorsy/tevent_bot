@@ -40,4 +40,3 @@ COPY ./app .
 
 # Run the application
 ENTRYPOINT ["python", "main.py"]
-# CMD ["--directory", "directory", "8000"]
