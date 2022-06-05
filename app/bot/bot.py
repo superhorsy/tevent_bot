@@ -1,43 +1,27 @@
 import configparser
-import random
 import re
-import string
-from datetime import datetime, timedelta
+from datetime import datetime
 
-import gspread
-import messages as msg
-import telebot
-from logger import get_logger
-from users import MongoDBUserAccessor, User, UserNotFoundError
+from telebot import TeleBot, apihelper, types
+
+import app.bot.messages as msg
+from app.bot.antispam_middlware import antispam_func
+from app.model.promo import DATETIME_FORMAT, Promo
+from app.model.users import User, UserNotFoundError
+from app.utils.google_tables import users_wks
+from app.utils.logger import get_logger
+from app.utils.mongo_db import users
 
 # Logger
 log = get_logger(__name__)
+# Bot
+apihelper.ENABLE_MIDDLEWARE = True
 # Config
 conf = configparser.ConfigParser()
 conf.read("config/config.ini")
-mongo_conf = conf["mongo"]
-
-
-bot = telebot.TeleBot(conf["bot"]["token"])
-
-# GoogleTables
-# Open a sheet from a spreadsheet in one go
-gc = gspread.service_account(filename="./config/google-service-account-key.json")
-sh = gc.open_by_key(conf["google"]["spreadsheet"])
-wks = sh.get_worksheet(0)
-try:
-    promo_wks = sh.get_worksheet(1)
-except gspread.WorksheetNotFound:
-    promo_wks = sh.add_worksheet("Promocodes", 0, 4, index=1)
-
-# MongoDB
-users = MongoDBUserAccessor(
-    mongo_conf.get("host", "localhost"),
-    int(mongo_conf.get("port", "27017")),
-    mongo_conf.get("db", "tevent"),
-)
-
-DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"
+bot = TeleBot(conf["bot"]["token"], num_threads=5)
+# Middlewares
+bot.register_middleware_handler(antispam_func, update_types=["message"])
 
 
 def _notify(user: User):
@@ -51,10 +35,10 @@ def _notify(user: User):
 def remind():
     log.info("Reminder started")
     user_list = users.keys()
-    for id in user_list:
-        log.info(f"Notifying chat: {id}")
+    for user_id in user_list:
+        log.info(f"Notifying chat: {user_id}")
         try:
-            user: User = users.get(id)
+            user: User = users.get(user_id)
         except UserNotFoundError as e:
             log.error(e)
             continue
@@ -66,6 +50,9 @@ def remind():
         log.info(f"Last promo: {last_promo}")
         if not last_promo:
             continue
+        log.info(
+            f"Current date is {datetime.now()}, next date is {last_promo.next_date()}"
+        )
         if last_promo.is_valid():
             log.info("Promo is valid")
             continue
@@ -90,11 +77,11 @@ def remind():
 
 
 def _send(mess: str, chat_id: int):
-    markup = telebot.types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     if users.exists(chat_id):
-        markup.add(telebot.types.KeyboardButton("🎲"))
-        markup.add(telebot.types.KeyboardButton("Выйти"), row_width=2)
-    markup.add(telebot.types.KeyboardButton("Справка"))
+        markup.add(types.KeyboardButton("🎲"))
+        markup.add(types.KeyboardButton("Выйти"), row_width=2)
+    markup.add(types.KeyboardButton("Справка"))
     clear_mess = mess.replace("\n", "")
     log.info(f"Chat: {chat_id}, message: {clear_mess}")
     bot.send_message(chat_id, mess, parse_mode="html", reply_markup=markup)
@@ -106,11 +93,11 @@ def main():
         start(message)
 
     @bot.message_handler(commands=["help"])
-    def show_help(message: telebot.types.Message):
+    def show_help(message: types.Message):
         _send(msg.HELP, message.chat.id)
 
     @bot.message_handler(commands=["start"])
-    def start(message: telebot.types.Message):
+    def start(message: types.Message):
         if users.exists(message.chat.id):
             _send(msg.EXISTING_USER, message.chat.id)
             return
@@ -123,7 +110,7 @@ def main():
         func=lambda message: message.text != "Справка"
         and not users.exists(message.chat.id)
     )
-    def login(message: telebot.types.Message):
+    def login(message: types.Message):
         input_phone = message.text
         log.info(f"Введено: {input_phone}")
         match = re.match(
@@ -139,11 +126,11 @@ def main():
         phone = [i for i in match.groups()[0] if str.isdigit(i)]
         search = f"\\+?[7,8]([\\s-]*{''.join(phone[:3])}[\\s-]*{''.join(phone[3:6])}[\\s-]*{''.join(phone[6:8])}[\\s-]*{''.join(phone[8:10])})"
 
-        find = wks.find(in_column=7, query=re.compile(search))
+        find = users_wks.find(in_column=7, query=re.compile(search))
         if find is None:
             _send(f"Номер телефона не найден. \n{msg.NOT_LOGGED_IN}", message.chat.id)
             return
-        values: list = wks.row_values(find.row)
+        values: list = users_wks.row_values(find.row)
         filtered_phone = "".join(phone)
 
         user = User(message.chat.id, filtered_phone)
@@ -161,7 +148,9 @@ def main():
         last_promo: Promo = Promo.find(user.phone)
 
         if last_promo and last_promo.is_valid():
-            log.info(f"User {user.chat_id} /{user.phone}/ has promo {last_promo.code}")
+            log.info(
+                f"User {user.chat_id} /{user.phone}/ has valid promo {last_promo.code}"
+            )
             _send(
                 f"Текущий промокод: \n"
                 f"🎫 Награда - {last_promo.award} \n"
@@ -185,7 +174,9 @@ def main():
         return
 
     @bot.message_handler(content_types=["text"])
-    def text_helper(message: telebot.types.Message):
+    def text_helper(message: types.Message):
+        if bot.temp_data and bot.temp_data.get(message.from_user.id) != "OK":
+            return
         log.debug(f"Message is {message}")
         if message.text == "🎲":
             if not users.exists(message.chat.id):
@@ -198,91 +189,3 @@ def main():
             logout(message)
 
     bot.infinity_polling(timeout=10, long_polling_timeout=5)
-
-
-class Promo:
-    # promo expiry interval in days
-    PROMO_EXPIRY_INTERVAL = 3
-
-    def __init__(
-        self,
-        phone: str,
-        code: str = None,
-        award: str = None,
-        date: datetime = None,
-    ) -> None:
-        if not award:
-            award = Promo.__generate_award()
-        self.award = award
-        if not code:
-            code = Promo.__generate_code()
-        self.code = code
-        if not date:
-            date = datetime.now()
-        self.date = date
-        self.phone = phone
-
-    def __str__(self):
-        return f"code: {self.code}, date: {self.date}, phone: {self.phone}"
-
-    def is_valid(self):
-        log.info(f"Current date is {datetime.now()}, next date is {self.next_date()}")
-        is_valid = datetime.now() < self.next_date()
-        log.info(f"Promo is valid {is_valid}")
-        return is_valid
-
-    def next_date(self) -> datetime:
-        return self.date + timedelta(days=Promo.PROMO_EXPIRY_INTERVAL)
-
-    @staticmethod
-    def find(phone: str):
-        """row: 0 - phone, 1 - date, 2 - code, 3 - award"""
-        promos_with_phone = [promo for promo in (promo_wks.get()) if promo[0] == phone]
-        if not promos_with_phone:
-            return None
-        promos_with_phone.sort(
-            key=lambda x: datetime.strptime(x[1], DATETIME_FORMAT), reverse=True
-        )
-        last_promo = promos_with_phone[0]
-
-        return Promo(
-            code=last_promo[2],
-            award=last_promo[3],
-            date=datetime.strptime(last_promo[1], DATETIME_FORMAT),
-            phone=last_promo[0],
-        )
-
-    @staticmethod
-    def new(phone: str):
-        return Promo(phone=phone).save()
-
-    @staticmethod
-    def __generate_code() -> str:
-        return "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
-
-    @staticmethod
-    def __generate_award() -> str:
-        award_40_perc = "1 час"
-        award_30_perc = "4 часа"
-        award_20_perc = "6 часов"
-        award_10_perc = "энергетик"
-        return random.choice(
-            [
-                award_40_perc,
-                award_40_perc,
-                award_40_perc,
-                award_40_perc,
-                award_30_perc,
-                award_30_perc,
-                award_30_perc,
-                award_20_perc,
-                award_20_perc,
-                award_10_perc,
-            ]
-        )
-
-    def save(self):
-        promo_wks.append_row(
-            [self.phone, self.date.strftime(DATETIME_FORMAT), self.code, self.award]
-        )
-        return self

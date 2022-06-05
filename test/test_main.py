@@ -3,7 +3,7 @@ from datetime import datetime
 
 
 def test_logger():
-    from app.logger import get_logger
+    from app.utils.logger import get_logger
 
     log = get_logger("test_log")
     log.info("test")

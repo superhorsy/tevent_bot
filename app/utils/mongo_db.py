@@ -1,40 +1,15 @@
-from abc import ABC
+import configparser
 
 import pymongo
 from pymongo.collection import Collection
 from pymongo.database import Database
 
+# Config
+from app.model.users import User, UserAccessor, UserNotFoundError
 
-class User:
-    chat_id: int
-    phone: str
-    notifications: list
-
-    def __init__(self, chat_id: int, phone: str, notifications: list = None):
-        self.notifications = [] if notifications is None else notifications
-        self.chat_id = chat_id
-        self.phone = phone
-
-
-class UserAccessor(ABC):
-    def exists(self, chat_id) -> bool:
-        pass
-
-    def get(self, chat_id) -> User:
-        pass
-
-    def set(self, user: User):
-        pass
-
-    def delete(self, chat_id):
-        pass
-
-    def keys(self):
-        pass
-
-
-class UserNotFoundError(Exception):
-    pass
+conf = configparser.ConfigParser()
+conf.read("config/config.ini")
+mongo_conf = conf["mongo"]
 
 
 class MongoDBUserAccessor(UserAccessor):
@@ -67,3 +42,10 @@ class MongoDBUserAccessor(UserAccessor):
 
     def keys(self):
         return [i.get("_id") for i in self.collection.find()]
+
+
+users = MongoDBUserAccessor(
+    mongo_conf.get("host", "localhost"),
+    int(mongo_conf.get("port", "27017")),
+    mongo_conf.get("db", "tevent"),
+)

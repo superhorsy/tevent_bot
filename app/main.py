@@ -3,13 +3,12 @@ import sys
 import threading
 import traceback
 
-import bot
-from logger import get_logger
+from app.bot import bot
+from app.utils.logger import get_logger
 
 log = get_logger("main_thr")
 
 REMIND_TIME_INTERVAL = 60 * 60 * 1.0
-# REMIND_TIME_INTERVAL = 20
 
 
 def run_bot():
@@ -32,8 +31,8 @@ def repeatedly_notify_users():
     bot.remind()
 
 
-def signal_handler(signal, _):
-    log.info(f"Application exited with signal {str(signal)}")
+def signal_handler(sign, _):
+    log.info(f"Application exited with signal {str(sign)}")
     sys.exit(0)
 
 
