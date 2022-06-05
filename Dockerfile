@@ -32,11 +32,12 @@ ENV PATH="/.venv/bin:$PATH"
 
 # Install application into container
 
-COPY ./app .
+COPY ./app /app
 
 #RUN chown -R appuser:appuser db
 #
 #USER appuser
 
 # Run the application
-ENTRYPOINT ["python", "main.py"]
+WORKDIR /app
+ENTRYPOINT ["python", "/app/main.py"]

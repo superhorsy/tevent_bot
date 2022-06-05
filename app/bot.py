@@ -10,12 +10,13 @@ import telebot
 from logger import get_logger
 from users import MongoDBUserAccessor, User, UserNotFoundError
 
+# Logger
+log = get_logger(__name__)
 # Config
 conf = configparser.ConfigParser()
 conf.read("config/config.ini")
 mongo_conf = conf["mongo"]
 
-log = get_logger(__name__)
 
 bot = telebot.TeleBot(conf["bot"]["token"])
 
@@ -157,19 +158,19 @@ def main():
 
     def get_promo(user: User):
         log.info(f"User {user.phone} looking for promo")
-        promo: Promo = Promo.find(user.phone)
+        last_promo: Promo = Promo.find(user.phone)
 
-        if promo and promo.is_valid():
-            log.info(f"User {user.chat_id} /{user.phone}/ has promo {promo.code}")
+        if last_promo and last_promo.is_valid():
+            log.info(f"User {user.chat_id} /{user.phone}/ has promo {last_promo.code}")
             _send(
                 f"Текущий промокод: \n"
-                f"🎫 Награда - {promo.award} \n"
-                f"🏷 Выдан {promo.date.strftime(DATETIME_FORMAT)} (МСК) \n"
-                f"🔐 Код {promo.code} \n",
+                f"🎫 Награда - {last_promo.award} \n"
+                f"🏷 Выдан {last_promo.date.strftime(DATETIME_FORMAT)} (МСК) \n"
+                f"🔐 Код {last_promo.code} \n",
                 user.chat_id,
             )
             _send(
-                f"Новый промокод будет доступен {promo.next_date().strftime(DATETIME_FORMAT)}.",
+                f"Новый промокод будет доступен {last_promo.next_date().strftime(DATETIME_FORMAT)}.",
                 user.chat_id,
             )
             return
@@ -208,7 +209,7 @@ class Promo:
         phone: str,
         code: str = None,
         award: str = None,
-        date: datetime = datetime.now(),
+        date: datetime = None,
     ) -> None:
         if not award:
             award = Promo.__generate_award()
@@ -216,6 +217,8 @@ class Promo:
         if not code:
             code = Promo.__generate_code()
         self.code = code
+        if not date:
+            date = datetime.now()
         self.date = date
         self.phone = phone
 
