@@ -223,7 +223,10 @@ class Promo:
         return f"code: {self.code}, date: {self.date}, phone: {self.phone}"
 
     def is_valid(self):
-        return datetime.now() < self.next_date()
+        log.info(f"Current date is {datetime.now()}, next date is {self.next_date()}")
+        is_valid = datetime.now() < self.next_date()
+        log.info(f"Promo is valid {is_valid}")
+        return is_valid
 
     def next_date(self) -> datetime:
         return self.date + timedelta(days=Promo.PROMO_EXPIRY_INTERVAL)
