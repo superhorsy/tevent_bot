@@ -27,7 +27,7 @@ repos:
         name: mypy
         stages: [commit]
         language: system
-        entry: pipenv run mypy
+        entry: pipenv run mypy --cache-dir=/dev/null
         types: [python]
         pass_filenames: false
 
