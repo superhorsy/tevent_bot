@@ -2,7 +2,6 @@
 .vscode
 users.db
 app/config
-app/db
 log
 /.pytest_cache/
 /.mypy_cache/

@@ -1,11 +1,9 @@
 import configparser
 
 import pymongo
+from model.users import User, UserAccessor, UserNotFoundError
 from pymongo.collection import Collection
 from pymongo.database import Database
-
-# Config
-from app.model.users import User, UserAccessor, UserNotFoundError
 
 conf = configparser.ConfigParser()
 conf.read("config/config.ini")

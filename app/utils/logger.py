@@ -46,7 +46,7 @@ def _get_file_handler(log_level, module_name, script_action):
     """
     Create and configure a file logging handler
     """
-    log_dir = "../../log"
+    log_dir = "../log"
     Path(log_dir).mkdir(exist_ok=True)
     log_file = (
         f'{log_dir}/{datetime.datetime.now().strftime("%Y%m%d")}-{module_name}'

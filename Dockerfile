@@ -40,4 +40,4 @@ COPY ./app /app
 
 # Run the application
 WORKDIR /app
-ENTRYPOINT ["python", "/app/main.py"]
+ENTRYPOINT ["python", "main.py"]

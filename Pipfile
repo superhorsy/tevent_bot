@@ -17,6 +17,7 @@ mypy = "*"
 pytest = "*"
 pytest-cov = "*"
 pre-commit = "*"
+types-retry = "*"
 
 [requires]
-python_version = "3.9.13"
+python_version = "3.9.12"

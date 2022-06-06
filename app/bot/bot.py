@@ -2,15 +2,14 @@ import configparser
 import re
 from datetime import datetime
 
+import bot.messages as msg
+from bot.antispam_middlware import antispam_func
+from model.promo import DATETIME_FORMAT, Promo
+from model.users import User, UserNotFoundError
 from telebot import TeleBot, apihelper, types
-
-import app.bot.messages as msg
-from app.bot.antispam_middlware import antispam_func
-from app.model.promo import DATETIME_FORMAT, Promo
-from app.model.users import User, UserNotFoundError
-from app.utils.google_tables import users_wks
-from app.utils.logger import get_logger
-from app.utils.mongo_db import users
+from utils.google_tables import users_wks
+from utils.logger import get_logger
+from utils.mongo_db import users
 
 # Logger
 log = get_logger(__name__)

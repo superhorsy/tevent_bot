@@ -4,9 +4,7 @@ from datetime import datetime, timedelta
 
 import gspread
 from retry import retry
-
-# promo expiry interval in days
-from app.utils.google_tables import promo_wks
+from utils.google_tables import promo_wks
 
 PROMO_EXPIRY_INTERVAL = 3
 DATETIME_FORMAT = "%d/%m/%Y %H:%M:%S"

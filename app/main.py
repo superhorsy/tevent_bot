@@ -3,8 +3,8 @@ import sys
 import threading
 import traceback
 
-from app.bot import bot
-from app.utils.logger import get_logger
+from bot import bot
+from utils.logger import get_logger
 
 log = get_logger("main_thr")
 
